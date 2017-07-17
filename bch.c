@@ -38,7 +38,7 @@ mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 		*itr = ':';
 		incr_itr(itr, 1);
 
-		mdl_u8_t byte_c = bcii_sizeof(src_itr);
+		mdl_u8_t byte_c = bcii_sizeof(src_itr) + bcii_overhead_size();
 
 		resize(&itr, &buff, &page_c, 2);
 		sprintf(itr, "%02X", byte_c);
