@@ -14,13 +14,15 @@ enum {
 	_bch_to_rbc
 };
 
-# define PAGE_SIZE 20
+# define PAGE_SIZE 12
 void resize(mdl_u8_t **__itr, mdl_u8_t **__ref, mdl_uint_t *__page_c, mdl_uint_t __nbc) {
 	mdl_uint_t curr_size = (*__itr)-(*__ref);
 
+	for (;;) {
 	if (curr_size+__nbc >= (*__page_c)*PAGE_SIZE) {
 		*__ref = (mdl_u8_t*)realloc(*__ref, (++(*__page_c))*PAGE_SIZE);
 		*__itr = (*__ref)+curr_size;
+	} else break;
 	}
 }
 
@@ -38,7 +40,7 @@ mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 		*itr = ':';
 		incr_itr(itr, 1);
 
-		mdl_u8_t byte_c = bcii_sizeof(src_itr) + bcii_overhead_size();
+		mdl_u8_t byte_c = bcii_sizeof(src_itr, *(bcii_flag_t*)(src_itr+1)) + bcii_overhead_size();
 
 		resize(&itr, &buff, &page_c, 2);
 		sprintf(itr, "%02X", byte_c);
@@ -110,44 +112,35 @@ mdl_u8_t* bch_to_rbc(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 	}
 
 	err:
-	*__dest_size = dest_itr-dest;
+	*__dest_size = dest_itr-dest-1;
 	return dest;
 }
 
-void usage() {
-	printf("usage: \n");
-	printf(" -o - dest file.\n");
-	printf(" -i - src file.\n");
-}
-
 int main(int __argc, char const *__argv[]) {
-	if (__argc < 6) {
-		usage();
+	if (__argc < 7) {
+		printf("usage:\n -o - dest file.\n -i - src file.\n -c - conv kind.\n");
 		return -1;
 	}
 
-	mdl_u8_t conv_type = (mdl_u8_t)~0;
-	char const *src_fpth = NULL, *dest_fpth = NULL;
-	for (mdl_u8_t i = 0; i != __argc; i ++) {
-		char const *s = __argv[i];
-
-		if (!strcmp(s, "-o"))
-			dest_fpth = *(__argv+(i++)+1);
-
-		if (!strcmp(s, "-i"))
-			src_fpth = *(__argv+(i++)+1);
-
-		if (!strcmp(s, "-c")) {
-			char const *conv = *(__argv+(i++)+1);
-			if (!strcmp(conv, "rbc")) {
-				conv_type = _bch_to_rbc;
-			} else if (!strcmp(conv, "bch")) {
-				conv_type = _rbc_to_bch;
-			}
+	mdl_u8_t conv_kind = (mdl_u8_t)~0;
+	char const *src_fpth = NULL, *dst_fpth = NULL;
+	char const **arg_itr = __argv+1;
+	while(arg_itr < __argv+__argc) {
+		if (!strcmp(*arg_itr, "-o"))
+			dst_fpth = *(++arg_itr);
+		else if (!strcmp(*arg_itr, "-i"))
+			src_fpth = *(++arg_itr);
+		else if (!strcmp(*arg_itr, "-c")) {
+			char const *s = *(++arg_itr);
+			if (!strcmp(s, "rbc"))
+				conv_kind = _bch_to_rbc;
+			else if (!strcmp(s, "bch"))
+				conv_kind = _rbc_to_bch;
 		}
+		arg_itr++;
 	}
 
-	if (conv_type == (mdl_u8_t)~0 || !src_fpth || !dest_fpth) {
+	if (conv_kind == (mdl_u8_t)~0 || !src_fpth || !dst_fpth) {
 		fprintf(stderr, "something went wong.\n");
 		return -1;
 	}
@@ -172,22 +165,22 @@ int main(int __argc, char const *__argv[]) {
 
 	mdl_u8_t *dest;
 	mdl_uint_t dest_size = 0;
-	if (conv_type == _rbc_to_bch)
+	if (conv_kind == _rbc_to_bch)
 		dest = rbc_to_bch(src, st.st_size, &dest_size);
-	else if (conv_type == _bch_to_rbc)
+	else if (conv_kind == _bch_to_rbc)
 		dest = bch_to_rbc(src, st.st_size, &dest_size);
 
-	printf("%s - %s - %u- %c\n", src_fpth, dest_fpth, dest_size, *(src+2));
+	printf("%s - %s - %u- %c\n", src_fpth, dst_fpth, dest_size, *(src+2));
 
-	if (access(dest_fpth, F_OK) != -1) {
-		if (truncate(dest_fpth, 0) < 0) {
-			fprintf(stderr, "failed to truncate file at %s\n", dest_fpth);
+	if (access(dst_fpth, F_OK) != -1) {
+		if (truncate(dst_fpth, 0) < 0) {
+			fprintf(stderr, "failed to truncate file at %s\n", dst_fpth);
 			goto err;
 		}
 	}
 
-	if ((fd = open(dest_fpth, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_ISUID)) < 0) {
-		fprintf(stderr, "failed to open file at %s\n", dest_fpth);
+	if ((fd = open(dst_fpth, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_ISUID)) < 0) {
+		fprintf(stderr, "failed to open file at %s\n", dst_fpth);
 		goto err;
 	}
 
