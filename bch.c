@@ -1,11 +1,10 @@
 # include <stdio.h>
 # include <malloc.h>
-# include <eint_t.h>
 # include <string.h>
 # include <unistd.h>
 # include <fcntl.h>
 # include <errno.h>
-# include <eint_t.h>
+# include <mdlint.h>
 # include <sys/stat.h>
 # include <bci.h>
 
@@ -40,7 +39,7 @@ mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 		*itr = ':';
 		incr_itr(itr, 1);
 
-		mdl_u8_t byte_c = bcii_sizeof(src_itr, *(bcii_flag_t*)(src_itr+1)) + bcii_overhead_size();
+		mdl_u8_t byte_c = bcii_sizeof(src_itr, *(bci_flag_t*)(src_itr+1)) + bcii_overhead_size();
 
 		resize(&itr, &buff, &page_c, 2);
 		sprintf(itr, "%02X", byte_c);
