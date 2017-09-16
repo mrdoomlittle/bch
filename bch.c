@@ -7,7 +7,7 @@
 # include <mdlint.h>
 # include <sys/stat.h>
 # include <bci.h>
-
+# include <sys/types.h>
 enum {
 	_rbc_to_bch,
 	_bch_to_rbc
@@ -28,7 +28,7 @@ void resize(mdl_u8_t **__itr, mdl_u8_t **__ref, mdl_uint_t *__page_c, mdl_uint_t
 # define incr_itr(__a, __b) __a+=__b;
 
 # include <math.h>
-mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size) {
+mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dst_size) {
 	mdl_u8_t *buff = (mdl_u8_t*)malloc(PAGE_SIZE);
 	mdl_uint_t page_c = 1;
 
@@ -67,16 +67,16 @@ mdl_u8_t* rbc_to_bch(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 
 	printf("exit.\n");
 
-	*__dest_size=itr-buff;
+	*__dst_size=itr-buff;
 	return buff;
 }
 
-mdl_u8_t* bch_to_rbc(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size) {
-	mdl_u8_t *dest = (mdl_u8_t*)malloc(PAGE_SIZE);
+mdl_u8_t* bch_to_rbc(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dst_size) {
+	mdl_u8_t *dst = (mdl_u8_t*)malloc(PAGE_SIZE);
 	mdl_uint_t page_c = 1;
 
 	mdl_u8_t *itr = __src;
-	mdl_u8_t *dest_itr = dest;
+	mdl_u8_t *dst_itr = dst;
 
 	mdl_u8_t byte_c;
 	while(itr < __src+__size) {
@@ -95,8 +95,8 @@ mdl_u8_t* bch_to_rbc(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 
 		mdl_u8_t *end = itr+(byte_c*2);
 		for (;itr != end;) {
-			resize(&dest_itr, &dest, &page_c, 1);
-			if (sscanf(itr, "%2hhx", dest_itr++) != 1) {
+			resize(&dst_itr, &dst, &page_c, 1);
+			if (sscanf(itr, "%2hhx", dst_itr++) != 1) {
 				fprintf(stderr, "failed to read data.\n");
 				goto err;
 			}
@@ -111,13 +111,13 @@ mdl_u8_t* bch_to_rbc(mdl_u8_t *__src, mdl_uint_t __size, mdl_uint_t *__dest_size
 	}
 
 	err:
-	*__dest_size = dest_itr-dest-1;
-	return dest;
+	*__dst_size = dst_itr-dst-1;
+	return dst;
 }
 
 int main(int __argc, char const *__argv[]) {
 	if (__argc < 7) {
-		printf("usage:\n -o - dest file.\n -i - src file.\n -c - conv kind.\n");
+		printf("usage:\n -o - dst file.\n -i - src file.\n -c - conv kind.\n");
 		return -1;
 	}
 
@@ -162,14 +162,14 @@ int main(int __argc, char const *__argv[]) {
 	read(fd, src, st.st_size);
 	close(fd);
 
-	mdl_u8_t *dest;
-	mdl_uint_t dest_size = 0;
+	mdl_u8_t *dst;
+	mdl_uint_t dst_size = 0;
 	if (conv_kind == _rbc_to_bch)
-		dest = rbc_to_bch(src, st.st_size, &dest_size);
+		dst = rbc_to_bch(src, st.st_size, &dst_size);
 	else if (conv_kind == _bch_to_rbc)
-		dest = bch_to_rbc(src, st.st_size, &dest_size);
+		dst = bch_to_rbc(src, st.st_size, &dst_size);
 
-	printf("%s - %s - %u- %c\n", src_fpth, dst_fpth, dest_size, *(src+2));
+	printf("%s - %s - %u- %c\n", src_fpth, dst_fpth, dst_size, *(src+2));
 
 	if (access(dst_fpth, F_OK) != -1) {
 		if (truncate(dst_fpth, 0) < 0) {
@@ -183,13 +183,12 @@ int main(int __argc, char const *__argv[]) {
 		goto err;
 	}
 
-	write(fd, dest, dest_size);
+	write(fd, dst, dst_size);
 
 	err:
 	close(fd);
 
-	free(dest);
-
+	free(dst);
 	free(src);
 	return 0;
 }
